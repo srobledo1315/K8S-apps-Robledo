@@ -1,0 +1,35 @@
+---
+- name: Aprovisionamiento de Infraestructura Base (DNS/DHCP)
+  hosts: infra_servers
+  become: true
+  tasks:
+    - name: Asegurar que el sistema está actualizado (opcional)
+      ansible.builtin.debug:
+        msg: "Iniciando despliegue de DNS y DHCP para {{ dns_domain }}"
+
+  roles:
+    - role: dns_bind
+      tags: ['dns']
+    - role: dhcpd
+      tags: ['dhcp']
+
+- name: Aprovisionamiento de Nodos Kubernetes (Requisitos Comunes)
+  hosts: kubernetes_cluster
+  become: true
+  roles:
+    - role: k8s_common
+      tags: ['k8s_common']
+
+- name: Inicialización del Master Node (Control Plane)
+  hosts: kubernetes_master
+  become: true
+  roles:
+    - role: k8s_master
+      tags: ['k8s_master']
+
+- name: Unión del Worker Node al Clúster
+  hosts: kubernetes_worker
+  become: true
+  roles:
+    - role: k8s_worker
+      tags: ['k8s_worker']

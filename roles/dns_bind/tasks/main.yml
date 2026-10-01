@@ -1,0 +1,52 @@
+---
+- name: Instalar paquetes de BIND9
+  ansible.builtin.package:
+    name: "{{ dns_bind_packages }}"
+    state: present
+
+- name: Habilitar puertos DNS en firewalld
+  ansible.posix.firewalld:
+    service: dns
+    permanent: true
+    state: enabled
+    immediate: true
+  register: dns_firewalld_result
+  failed_when:
+    - dns_firewalld_result.failed
+    - "'is not running' not in dns_firewalld_result.msg | default('')"
+
+- name: Desplegar configuración principal (named.conf) con validación
+  ansible.builtin.template:
+    src: named.conf.j2
+    dest: /etc/named.conf
+    owner: root
+    group: named
+    mode: '0640'
+    validate: 'named-checkconf %s'
+  notify: Restart named
+
+- name: Desplegar zona de búsqueda directa con validación
+  ansible.builtin.template:
+    src: zone.forward.j2
+    dest: /var/named/{{ dns_domain }}.db
+    owner: root
+    group: named
+    mode: '0640'
+    validate: 'named-checkzone {{ dns_domain }} %s'
+  notify: Reload named
+
+- name: Desplegar zona de búsqueda inversa con validación
+  ansible.builtin.template:
+    src: zone.reverse.j2
+    dest: /var/named/{{ dns_reverse_zone }}.db
+    owner: root
+    group: named
+    mode: '0640'
+    validate: 'named-checkzone {{ dns_reverse_zone }} %s'
+  notify: Reload named
+
+- name: Asegurar que el servicio BIND (named) está habilitado y en ejecución
+  ansible.builtin.service:
+    name: named
+    state: started
+    enabled: true
