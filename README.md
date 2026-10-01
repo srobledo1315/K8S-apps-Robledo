@@ -10,34 +10,34 @@ Se empaquetó el código fuente de la aplicación web ("Hola Mundo" en Python/Fl
 ### 2. Despliegue Declarativo y Validación de Réplicas (Fase 3 y 5)
 Se aplicaron los manifiestos YAML (`kubectl apply -f .`), aprovisionando de manera atómica todos los recursos requeridos: Deployment, ReplicaSet, Secrets, ConfigMap y Service. Posteriormente, verificamos la correcta creación y el escalamiento a las réplicas configuradas.
 
-![Validación de Pods y Réplicas](image.png)
+![Validación de Pods y Réplicas](imagenes/image.png)
 *En la imagen se observa la salida de `kubectl get pods`, confirmando que todas las réplicas solicitadas (tanto del Deployment como del ReplicaSet) se encuentran en estado `Running`, evidenciando el correcto aprovisionamiento.*
 
 ### 3. Exposición de la Aplicación (Fase 4)
 Para permitir el tráfico exterior hacia los pods, validamos la instanciación del servicio configurado como `NodePort`.
 
-![Listado de Servicios](image%20copy%203.png)
+![Listado de Servicios](imagenes/image%20copy%203.png)
 *Listado general de servicios (`kubectl get services`) comprobando la asignación del puerto externo 30001 (NodePort) mapeado al puerto interno 80.*
 
-![Descripción del Servicio](image%20copy%204.png)
+![Descripción del Servicio](imagenes/image%20copy%204.png)
 *Inspección detallada (`kubectl describe svc`) que evidencia los Endpoints (IPs privadas efímeras de los pods) que están recibiendo tráfico balanceado por este servicio.*
 
 ### 4. Prueba de Resiliencia y Self-Healing (Fase 6)
 Se validó la capacidad de auto-recuperación intrínseca de Kubernetes mediante la eliminación deliberada de un pod en ejecución.
 
-![Prueba de Self-Healing](image%20copy.png)
+![Prueba de Self-Healing](imagenes/image%20copy.png)
 *La captura muestra la ejecución del comando `kubectl delete pod` y la subsecuente revisión, demostrando que el bucle de control del ReplicaSet reaccionó de manera inmediata generando una nueva réplica para mantener la alta disponibilidad sin intervención manual.*
 
 ### 5. Análisis y Telemetría (Retos Adicionales)
 Como parte de las tareas complementarias, se inspeccionó la salida estándar del contenedor para asegurar la integridad de la inicialización de la aplicación.
 
-![Logs del Contenedor](image%20copy%202.png)
+![Logs del Contenedor](imagenes/image%20copy%202.png)
 *Visualización de telemetría (`kubectl logs`) confirmando que el servidor WSGI/Flask arrancó exitosamente y se encuentra a la escucha en el puerto 5000 dentro del contenedor.*
 
 ### 6. Verificación de Accesibilidad (Resultados Esperados)
 El hito definitivo fue validar que el enrutamiento físico funcionaba de extremo a extremo a través de la red del clúster.
 
-![Prueba de Conexión](image%20copy%205.png)
+![Prueba de Conexión](imagenes/image%20copy%205.png)
 *Ejecución de una petición `curl` dirigida hacia la IP del nodo worker (`192.168.10.21`) sobre el puerto expuesto (`30001`), recibiendo exitosamente la respuesta HTTP generada por el script Python subyacente.*
 
 ---
