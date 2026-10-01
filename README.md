@@ -1,6 +1,27 @@
 # Reporte - Laboratorio - Práctica Kubernetes
 
-## Flujo de Trabajo y Ejecución
+## Topología e Infraestructura (Vagrant y Ansible)
+
+El entorno base para este despliegue se orquestó mediante "Infraestructura como Código" (IaC) utilizando Vagrant y Ansible, aprovisionando tres máquinas virtuales con Rocky Linux 9:
+
+1. **Servidor Bastión (`bastion`)**: Funciona como nodo de gestión, servidor DNS y DHCP para la red privada (`lab_net`).
+   - *Hardware:* 1 vCPU, 1GB RAM.
+   - *Red:* IP Estática `192.168.10.10`.
+   - *Acceso:* `vagrant ssh bastion`
+
+2. **Nodo Maestro (`master`)**: Ejecuta el Plano de Control (Control Plane) de Kubernetes.
+   - *Hardware:* 2 vCPUs, 2GB RAM.
+   - *Red:* IP dinámica (DHCP) resuelta a `192.168.10.20`.
+   - *Acceso:* `vagrant ssh master`
+
+3. **Nodo de Trabajo (`worker`)**: Ejecuta las cargas de trabajo (Pods y contenedores).
+   - *Hardware:* 1 vCPU, 2GB RAM.
+   - *Red:* IP dinámica (DHCP) resuelta a `192.168.10.21`.
+   - *Acceso:* `vagrant ssh worker`
+
+El aprovisionamiento automatizado del clúster se gestionó a través de un playbook de Ansible (`site.yml`), el cual instaló dependencias, configuró containerd como *container runtime*, inicializó `kubeadm` en el maestro y unió el nodo worker de manera transparente.
+
+## Flujo de Trabajo y Ejecución (Despliegue de la Aplicación)
 
 Durante esta práctica de laboratorio, se llevó a cabo el despliegue exitoso de una aplicación contenerizada en un clúster auto-gestionado de Kubernetes, evidenciando el cumplimiento de todas las fases operativas:
 
