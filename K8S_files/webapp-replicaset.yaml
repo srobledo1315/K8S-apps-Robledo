@@ -14,8 +14,6 @@ spec:
     spec:
       containers:
       - name: app-container
-        image: <nombre_de_usuario_en_docker_hub>/<nombre_del_repositorio>:<tag>
+        image: azgomez/webapp-hola-mundo:v1
         ports:
         - containerPort: 5000
-      imagePullSecrets:
-      - name: regcred
