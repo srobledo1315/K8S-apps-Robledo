@@ -1,166 +1,239 @@
-# Reporte - Laboratorio - Práctica Kubernetes
+# Reporte Técnico Integral: Laboratorio de Despliegue en Kubernetes
 
-## Topología e Infraestructura (Vagrant y Ansible)
-
-El entorno base para este despliegue se orquestó mediante "Infraestructura como Código" (IaC) utilizando Vagrant y Ansible, aprovisionando tres máquinas virtuales con Rocky Linux 9:
-
-1. **Servidor Bastión (`bastion`)**: Funciona como nodo de gestión, servidor DNS y DHCP para la red privada (`lab_net`).
-   - *Hardware:* 1 vCPU, 1GB RAM.
-   - *Red:* IP Estática `192.168.10.10`.
-   - *Acceso:* `vagrant ssh bastion`
-
-2. **Nodo Maestro (`master`)**: Ejecuta el Plano de Control (Control Plane) de Kubernetes.
-   - *Hardware:* 2 vCPUs, 2GB RAM.
-   - *Red:* IP dinámica (DHCP) resuelta a `192.168.10.20`.
-   - *Acceso:* `vagrant ssh master`
-
-3. **Nodo de Trabajo (`worker`)**: Ejecuta las cargas de trabajo (Pods y contenedores).
-   - *Hardware:* 1 vCPU, 2GB RAM.
-   - *Red:* IP dinámica (DHCP) resuelta a `192.168.10.21`.
-   - *Acceso:* `vagrant ssh worker`
-
-El aprovisionamiento automatizado del clúster se gestionó a través de un playbook de Ansible (`site.yml`), el cual instaló dependencias, configuró containerd como *container runtime*, inicializó `kubeadm` en el maestro y unió el nodo worker de manera transparente.
-
-## Flujo de Trabajo y Ejecución (Despliegue de la Aplicación)
-
-Durante esta práctica de laboratorio, se llevó a cabo el despliegue exitoso de una aplicación contenerizada en un clúster auto-gestionado de Kubernetes, evidenciando el cumplimiento de todas las fases operativas:
-
-### 1. Preparación y Construcción (Docker Build y Push)
-Se empaquetó el código fuente de la aplicación web ("Hola Mundo" en Python/Flask) construyendo la imagen de Docker localmente. Posteriormente, se subió la imagen al repositorio público en Docker Hub para garantizar que los nodos del clúster pudieran descargarla. Una vez finalizado el proceso de publicación, ingresamos a la máquina virtual del nodo maestro (`master`) mediante SSH para gestionar la orquestación de la infraestructura.
-
-### 2. Despliegue Declarativo y Validación de Réplicas (Fase 3 y 5)
-Se aplicaron los manifiestos YAML (`kubectl apply -f .`), aprovisionando de manera atómica todos los recursos requeridos: Deployment, ReplicaSet, Secrets, ConfigMap y Service. Posteriormente, verificamos la correcta creación y el escalamiento a las réplicas configuradas.
-
-![Validación de Pods y Réplicas](imagenes/image.png)
-*En la imagen se observa la salida de `kubectl get pods`, confirmando que todas las réplicas solicitadas (tanto del Deployment como del ReplicaSet) se encuentran en estado `Running`, evidenciando el correcto aprovisionamiento.*
-
-### 3. Exposición de la Aplicación (Fase 4)
-Para permitir el tráfico exterior hacia los pods, validamos la instanciación del servicio configurado como `NodePort`.
-
-![Listado de Servicios](imagenes/image%20copy%203.png)
-*Listado general de servicios (`kubectl get services`) comprobando la asignación del puerto externo 30001 (NodePort) mapeado al puerto interno 80.*
-
-![Descripción del Servicio](imagenes/image%20copy%204.png)
-*Inspección detallada (`kubectl describe svc`) que evidencia los Endpoints (IPs privadas efímeras de los pods) que están recibiendo tráfico balanceado por este servicio.*
-
-### 4. Prueba de Resiliencia y Self-Healing (Fase 6)
-Se validó la capacidad de auto-recuperación intrínseca de Kubernetes mediante la eliminación deliberada de un pod en ejecución.
-
-![Prueba de Self-Healing](imagenes/image%20copy.png)
-*La captura muestra la ejecución del comando `kubectl delete pod` y la subsecuente revisión, demostrando que el bucle de control del ReplicaSet reaccionó de manera inmediata generando una nueva réplica para mantener la alta disponibilidad sin intervención manual.*
-
-### 5. Análisis y Telemetría (Retos Adicionales)
-Como parte de las tareas complementarias, se inspeccionó la salida estándar del contenedor para asegurar la integridad de la inicialización de la aplicación.
-
-![Logs del Contenedor](imagenes/image%20copy%202.png)
-*Visualización de telemetría (`kubectl logs`) confirmando que el servidor WSGI/Flask arrancó exitosamente y se encuentra a la escucha en el puerto 5000 dentro del contenedor.*
-
-### 6. Pruebas de Funcionamiento y Acceso (Paso a Paso)
-Para validar exhaustivamente el enrutamiento físico y el funcionamiento del aplicativo, ejecuta la siguiente batería de pruebas:
-
-**Prueba A: Verificación de IP del Worker y Servicios**
-- **VM (Entorno):** `master`
-- **Acceso previo:** `vagrant ssh master`
-- **Comando:**
-  ```bash
-  kubectl get nodes -o wide
-  ```
-  *(Identifica la IP en la columna `INTERNAL-IP` de tu `worker`. Ejemplo: `192.168.10.21`).*
-- **Comando:**
-  ```bash
-  kubectl get svc webapp-service
-  ```
-  *(Verifica que el `NodePort` asignado sea `30001`).*
-
-**Prueba B: Petición HTTP Interna (Tráfico SDN)**
-- **VM (Entorno):** `master`
-- **Comando:**
-  ```bash
-  curl http://192.168.10.21:30001
-  ```
-- **Resultado Esperado:** Recibir el payload crudo emitido por Flask: `¡Hola Mundo desde Kubernetes!`.
-
-![Prueba de Conexión](imagenes/image%20copy%205.png)
-*Ejecución exitosa de la petición HTTP.*
-
-**Prueba C: Petición HTTP Externa (Tráfico de Usuario Final)**
-- **VM (Entorno):** Máquina Física Host (tu PC).
-- **Acción:** Abre un navegador web (Chrome/Firefox/Edge) y navega a la URL:
-  `http://192.168.10.21:30001`
-- **Resultado Esperado:** La página cargará el texto de respuesta. Esto demuestra que la red `lab_net` de VirtualBox está ruteando el tráfico desde tu host físico hacia el Kernel del Worker, el cual usa `kube-proxy` e `iptables` para inyectarlo al Pod de Docker.
+Este repositorio contiene la arquitectura completa, aprovisionamiento de infraestructura como código (IaC), contenerización OCI y manifiestos de orquestación para el despliegue resiliente y seguro de una aplicación web distribuida en un clúster auto-gestionado de Kubernetes con `kubeadm`.
 
 ---
 
-# Kubernetes Application Deployment Lab
-This lab demonstrates how to deploy a simple application using Kubernetes. The lab utilizes various Kubernetes resources such as Deployments, ReplicaSets, Services, Secrets, and ConfigMaps to deploy and manage the application.
+## 1. Topología de Infraestructura (Vagrant, VirtualBox y Ansible)
 
-## Prerequisites
-Before starting this lab, you should have the following prerequisites installed:
-- kubectl: Kubernetes command-line tool.
-- Docker: Containerization platform to build and push container images.
-## Description
-In this lab, we deploy a simple web application to a Kubernetes cluster. The application consists of a backend service and a frontend interface. We utilize the following Kubernetes resources:
-- Deployment: Manages the Pods and ReplicaSets, ensuring the desired number of Pod replicas are running.
-- ReplicaSet: Ensures that a specified number of Pod replicas are running at all times.
-- Service: Exposes the application to external traffic and provides load balancing.
-- Secrets: Stores sensitive data such as credentials securely.
-- ConfigMap: Stores non-sensitive configuration data for the application.
-## Lab Structure
-The lab repository contains the following files:
+El entorno base se aprovisiona mediante Vagrant y Ansible sobre el hipervisor VirtualBox, implementando tres máquinas virtuales con **Rocky Linux 9 (x86_64)** interconectadas mediante una red interna conmutada (`lab_net`):
 
-- webapp-deployment.yaml: Defines the Deployment for the application.
-- webapp-service.yaml: Defines the Service to expose the application.
-- webapp-configmap.yaml: Defines the ConfigMap for application configuration.
-- webapp-dhsecret.yaml and webapp-dbsecret.yaml: Defines the Secrets for sensitive data storage.
+| Máquina Virtual | Rol en la Arquitectura | vCPU | RAM | Interfaz NAT (eth0) | Interfaz Interna (eth1) | Acceso CLI |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **`bastion`** | Servidor de Gestión, DNS (BIND9) y DHCPd | 1 | 1024 MB | DHCP (`10.0.2.15/24`) | Estática: `192.168.10.10/24` | `vagrant ssh bastion` |
+| **`master`** | Control Plane (API Server, etcd, Scheduler, CM) | 2 | 2048 MB | DHCP (`10.0.2.15/24`) | DHCP: `192.168.10.20/24` | `vagrant ssh master` |
+| **`worker`** | Data Plane (Kubelet, Kube-Proxy, Flannel CNI) | 1 | 2048 MB | DHCP (`10.0.2.15/24`) | DHCP: `192.168.10.21/24` | `vagrant ssh worker` |
 
-## Steps
+### Enrutamiento Físico y Reenvío de Puertos (Port-Forwarding)
+Dado que la red `lab_net` está configurada como `virtualbox__intnet` (aislada dentro del conmutador virtual de VirtualBox sin interfaz directa en el sistema operativo anfitrión), se configuró una regla de reenvío de puertos NAT a nivel de hipervisor en el nodo `worker`:
+- **Puerto Anfitrión (Host):** `127.0.0.1:30001`
+- **Puerto Invitado (Guest):** `30001` (NodePort del servicio en `worker`)
 
-### Step 1: Create a Docker Image
-1. Clone this repository to your local machine.
-2. Navigate to the `K8S-apps` directory.
-3. Build the Docker image using the provided Dockerfile:
-    ```bash
-    # docker build -t web-app .
-    # docker tag webapp:latest <your-dockerhub-username>/webapp:v1
-    ```
-4. Push the Docker image to your Docker Hub repository:
-    ```bash
-    docker push <your-dockerhub-username>/webapp:v1
-    ```
+---
 
-### Step 2: Update Deployment and ReplicaSet Configurations
-1. Open files `app-deployment.yaml` and `app-replicaset.yaml` in the K8S_files directory.
-2. Replace `<nombre_de_usuario_en_docker_hub>` with your Docker Hub username.
-3. Replace `<nombre_del_repositorio>` with the name of your Docker Hub repository.
-4. Replace `<tag>` with the desired tag for your image.
-5. Save the changes.
+## 2. Diagrama de Arquitectura y Planos del Clúster
 
-### Step 3: Apply Kubernetes Configurations
-Apply the Kubernetes configurations to deploy the application:
+```mermaid
+graph TD
+    subgraph Host_Fisico["Máquina Anfitriona (Host OS)"]
+        UserBrowser["Navegador Web / cURL<br/>http://127.0.0.1:30001"]
+        VagrantCtrl["Vagrant CLI<br/>(SSH Port 2200/2201/2222)"]
+    end
+
+    subgraph VirtualBox_Hypervisor["VirtualBox Engine"]
+        PortForward["NAT Port Forwarding<br/>127.0.0.1:30001 <--> Guest:30001"]
+        IntSwitch["Virtual Switch: 'lab_net'"]
+    end
+
+    subgraph Control_Plane["Nodo Master (192.168.10.20)"]
+        KubeAPI["kube-apiserver (:6443)"]
+        ETCD[("etcd Storage")]
+        ControllerMgr["kube-controller-manager"]
+        KubeSched["kube-scheduler"]
+        KubeAPI <--> ETCD
+        KubeAPI --- ControllerMgr
+        KubeAPI --- KubeSched
+    end
+
+    subgraph Data_Plane["Nodo Worker (192.168.10.21)"]
+        KubeletDaemon["kubelet (:10250)"]
+        KubeProxyDaemon["kube-proxy (iptables / NAT)"]
+        FlannelOverlay["Flannel CNI (flannel.1 VXLAN UDP 8472)"]
+        
+        subgraph Pods_Running["Pods Namespace (10.244.1.0/24)"]
+            Pod1["webapp-deployment-xxx<br/>10.244.1.33:5000"]
+            Pod2["webapp-deployment-yyy<br/>10.244.1.34:5000"]
+            Pod3["webapp-deployment-zzz<br/>10.244.1.35:5000"]
+        end
+    end
+
+    UserBrowser --> PortForward
+    PortForward --> KubeProxyDaemon
+    VagrantCtrl --> MasterNode
+    VagrantCtrl --> WorkerNode
+    IntSwitch --- MasterNode
+    IntSwitch --- WorkerNode
+
+    KubeAPI -->|Control / Heartbeats| KubeletDaemon
+    KubeProxyDaemon -->|DNAT Round-Robin| FlannelOverlay
+    FlannelOverlay --> Pod1
+    FlannelOverlay --> Pod2
+    FlannelOverlay --> Pod3
+```
+
+---
+
+## 3. Seguridad, Optimización OCI y Código de Aplicación
+
+### A. Contexto de Construcción y Seguridad OCI (`.dockerignore` y `Dockerfile`)
+1. **Minimización de Superficie de Ataque (`.dockerignore`):**
+   Se previene la fuga involuntaria de artefactos confidenciales (historial `.git/`, llaves privadas SSH en `.vagrant/`, capturas y archivos YAML de infraestructura). El contexto de construcción se optimizó de ~10 MB a solo **622 bytes**.
+2. **Ejecución con Mínimo Privilegio (Non-root):**
+   El contenedor ya no corre como `root`. Se creó el usuario de sistema `appuser` con `UID 10001`:
+   ```dockerfile
+   FROM python:3.9-slim
+   WORKDIR /app
+   RUN useradd -u 10001 -m appuser
+   COPY requirements.txt /app/
+   RUN pip install --no-cache-dir -r requirements.txt
+   COPY app.py /app/
+   USER 10001
+   EXPOSE 5000
+   CMD ["python", "app.py"]
+   ```
+3. **Fijación Determinista de Dependencias (`requirements.txt`):**
+   Se garantiza reproducibilidad e inmutabilidad fijando `Flask==3.0.3`.
+
+### B. Aplicación Web y Telemetría de Salud (`app.py`)
+- **Mitigación RCE:** Se eliminó la directiva `debug=True` que habilitaba el depurador interactivo de Werkzeug en interfaces públicas.
+- **Consumo Real de ConfigMaps y Secrets:** El microservicio lee dinámicamente las variables de entorno inyectadas por Kubernetes (`APP_ENV` y `DB_USERNAME`).
+- **Endpoint de Sondas (`/healthz`):** Expone un endpoint HTTP 200 con payload JSON `{"status":"healthy"}` para verificar liveness y readiness sin generar sobrecarga.
+
+---
+
+## 4. Manifiestos y Recursos de Kubernetes (`K8S_files/`)
+
+1. **`webapp-configmap.yaml`:**
+   Define la variable no confidencial `APP_ENV: production`.
+2. **`webapp-dbsecret.yaml`:**
+   Almacena las credenciales de base de datos (`db_username: admin`, `db_userpassword: password`) codificadas en base64 bajo un secreto tipo `Opaque`.
+3. **`webapp-dhsecret.yaml`:**
+   Configurado con el estándar OCI `type: kubernetes.io/dockerconfigjson` para autenticación segura contra Docker Hub.
+4. **`webapp-deployment.yaml`:**
+   - **Replicas:** 3 Pods en alta disponibilidad.
+   - **Límites cgroups:** `requests` (50m CPU, 64Mi RAM) y `limits` (200m CPU, 128Mi RAM) para prevenir *Out-Of-Memory* (OOMKill) en el nodo worker de 2GB.
+   - **Probes:** `livenessProbe` (cada 10s) y `readinessProbe` (cada 5s) monitoreando `/healthz` en el puerto 5000.
+5. **`webapp-replicaset.yaml`:**
+   Desacoplado bajo la etiqueta `app: hola-mundo-rs` para evitar contiendas y condiciones de carrera con el bucle de reconciliación del `deployment-controller`.
+6. **`webapp-service.yaml`:**
+   Servicio de tipo `NodePort` mapeando el puerto externo `30001` hacia el puerto `80` del servicio y balanceando por DNAT al puerto `5000` de los Pods.
+
+---
+
+## 5. Evidencias del Laboratorio (Fases Operativas)
+
+### Fase 1: Despliegue Declarativo y Réplicas (Fases 3 y 5)
+Aprovisionamiento atómico de todos los recursos requeridos y validación del escalamiento a 3 réplicas en ejecución:
+
+![Validación de Pods y Réplicas](imagenes/image.png)
+*Salida de `kubectl get pods` confirmando estado `Running` en los Pods distribuidos.*
+
+### Fase 2: Exposición del Servicio NodePort (Fase 4)
+Exposición de la capa de transporte exterior hacia la red del clúster:
+
+![Listado de Servicios](imagenes/image%20copy%203.png)
+*Listado general (`kubectl get services`) comprobando el NodePort 30001 mapeado al puerto 80.*
+
+![Descripción del Servicio](imagenes/image%20copy%204.png)
+*Detalle de `kubectl describe svc webapp-service` evidenciando los Endpoints efímeros de los Pods recibiendo tráfico.*
+
+### Fase 3: Resiliencia y Auto-Recuperación (Self-Healing) (Fase 6)
+Eliminación deliberada de un Pod para verificar el bucle de control del orquestador:
+
+![Prueba de Self-Healing](imagenes/image%20copy.png)
+*Eliminación de un pod con `kubectl delete pod` y generación inmediata de un nuevo reemplazo por el controlador.*
+
+### Fase 4: Telemetría y Logs del Contenedor
+Inspección de la salida estándar del runtime:
+
+![Logs del Contenedor](imagenes/image%20copy%202.png)
+*Telemetría (`kubectl logs`) confirmando la inicialización en el puerto 5000 dentro del contenedor.*
+
+---
+
+## 6. Runbook de Pruebas y Validación Operativa
+
+Ejecuta la siguiente batería técnica para auditar y verificar el funcionamiento completo:
+
+### Prueba A: Verificación del Estado del Clúster
+- **Entorno:** Nodo `master`
+- **Acceso:** `vagrant ssh master`
+- **Comandos:**
+  ```bash
+  kubectl get nodes -o wide
+  kubectl get pods -o wide
+  kubectl get svc webapp-service
+  ```
+- **Criterio de Aceptación:** Nodos en estado `Ready`, Pods en `Running` (1/1 READY) y servicio `NodePort` en puerto `30001`.
+
+### Prueba B: Petición HTTP Interna (Red Overlay SDN)
+- **Entorno:** Nodo `master`
+- **Comandos:**
+  ```bash
+  # Petición a la aplicación principal
+  curl -s http://192.168.10.21:30001
+
+  # Petición al endpoint de telemetría de salud
+  curl -s http://192.168.10.21:30001/healthz
+  ```
+- **Resultado Esperado:**
+  ```text
+  ¡Hola Mundo desde Kubernetes! [Entorno: production | DB User: admin]
+  {"status":"healthy"}
+  ```
+
+![Prueba de Conexión](imagenes/image%20copy%205.png)
+*Ejecución exitosa de la consulta HTTP interna.*
+
+### Prueba C: Petición HTTP Externa (Desde la Máquina Anfitriona)
+- **Entorno:** Terminal o Navegador de tu PC anfitriona (Host OS).
+- **Comando en Terminal Host:**
+  ```bash
+  curl -i http://127.0.0.1:30001
+  ```
+- **Acceso vía Navegador:** Abre Google Chrome, Firefox o Edge y accede a:
+  `http://localhost:30001` o `http://127.0.0.1:30001`
+- **Resultado Esperado:**
+  ```http
+  HTTP/1.1 200 OK
+  Server: Werkzeug/3.1.9 Python/3.9.25
+  Content-Type: text/html; charset=utf-8
+
+  ¡Hola Mundo desde Kubernetes! [Entorno: production | DB User: admin]
+  ```
+
+---
+
+## 7. Procedimiento de Despliegue y Limpieza
+
+### Ciclo de Construcción y Publicación de la Imagen Docker
 ```bash
+# Construcción local aplicando .dockerignore y requisitos fijados
+docker build -t <tu_usuario_dockerhub>/webapp-hola-mundo:v2 .
+
+# Publicación al registro OCI
+docker push <tu_usuario_dockerhub>/webapp-hola-mundo:v2
+```
+
+### Aplicación Declarativa de Manifiestos
+```bash
+# Aplicar infraestructura declarativa en el master
 kubectl apply -f K8S_files/webapp-configmap.yaml
 kubectl apply -f K8S_files/webapp-dhsecret.yaml
 kubectl apply -f K8S_files/webapp-dbsecret.yaml
 kubectl apply -f K8S_files/webapp-deployment.yaml
 kubectl apply -f K8S_files/webapp-replicaset.yaml
 kubectl apply -f K8S_files/webapp-service.yaml
- ```
-### Step 4: Access the Application
-Once the resources are deployed, you can access the application by finding the external IP of the Service:
-```bash
-kubectl get svc webapp-service
- ```
-Then, open a web browser and navigate to http://<EXTERNAL_IP>:30001.
 
-### Step 5:
-To clean up the resources created in this lab, run the following command:
+# Comprobar el rollout del Deployment
+kubectl rollout status deployment webapp-deployment
+```
+
+### Limpieza de Recursos (Teardown)
 ```bash
 kubectl delete deployment webapp-deployment
 kubectl delete replicaset webapp-replicaset
 kubectl delete service webapp-service
 kubectl delete configmap webapp-configmap
-kubectl delete secret webapp-dhsecret webapp-dbsecret
- ```
-## Additional Notes
-You can customize the application by modifying the source code in the app directory.
-Explore other Kubernetes resources and features to further enhance your understanding of Kubernetes.
+kubectl delete secret regcred db-secrets
+```

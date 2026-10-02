@@ -40,6 +40,8 @@ Vagrant.configure("2") do |config|
       vb.cpus = 1
     end
 
+    worker.vm.network "forwarded_port", guest: 30001, host: 30001, auto_correct: true
+
     # Provisionamiento automático con Ansible al terminar de levantar las máquinas
     worker.vm.provision "ansible" do |ansible|
       ansible.playbook = "site.yml"

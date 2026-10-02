@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: webapp-deployment
+  labels:
+    app.kubernetes.io/name: webapp
 spec:
   replicas: 3
   selector:
@@ -14,9 +16,30 @@ spec:
     spec:
       containers:
       - name: app-container
-        image: azgomez/webapp-hola-mundo:v1
+        image: azgomez/webapp-hola-mundo:v2
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
+          name: http
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 5000
+          initialDelaySeconds: 2
+          periodSeconds: 5
         envFrom:
         - configMapRef:
             name: webapp-configmap
@@ -31,4 +54,3 @@ spec:
             secretKeyRef:
               name: db-secrets
               key: db_userpassword
-

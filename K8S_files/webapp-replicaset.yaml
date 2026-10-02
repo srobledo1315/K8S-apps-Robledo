@@ -2,18 +2,20 @@ apiVersion: apps/v1
 kind: ReplicaSet
 metadata:
   name: webapp-replicaset
+  labels:
+    app: hola-mundo-rs
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
-      app: hola-mundo
+      app: hola-mundo-rs
   template:
     metadata:
       labels:
-        app: hola-mundo
+        app: hola-mundo-rs
     spec:
       containers:
       - name: app-container
-        image: azgomez/webapp-hola-mundo:v1
+        image: azgomez/webapp-hola-mundo:v2
         ports:
         - containerPort: 5000
