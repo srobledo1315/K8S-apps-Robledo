@@ -55,11 +55,39 @@ Como parte de las tareas complementarias, se inspeccionó la salida estándar de
 ![Logs del Contenedor](imagenes/image%20copy%202.png)
 *Visualización de telemetría (`kubectl logs`) confirmando que el servidor WSGI/Flask arrancó exitosamente y se encuentra a la escucha en el puerto 5000 dentro del contenedor.*
 
-### 6. Verificación de Accesibilidad (Resultados Esperados)
-El hito definitivo fue validar que el enrutamiento físico funcionaba de extremo a extremo a través de la red del clúster.
+### 6. Pruebas de Funcionamiento y Acceso (Paso a Paso)
+Para validar exhaustivamente el enrutamiento físico y el funcionamiento del aplicativo, ejecuta la siguiente batería de pruebas:
+
+**Prueba A: Verificación de IP del Worker y Servicios**
+- **VM (Entorno):** `master`
+- **Acceso previo:** `vagrant ssh master`
+- **Comando:**
+  ```bash
+  kubectl get nodes -o wide
+  ```
+  *(Identifica la IP en la columna `INTERNAL-IP` de tu `worker`. Ejemplo: `192.168.10.21`).*
+- **Comando:**
+  ```bash
+  kubectl get svc webapp-service
+  ```
+  *(Verifica que el `NodePort` asignado sea `30001`).*
+
+**Prueba B: Petición HTTP Interna (Tráfico SDN)**
+- **VM (Entorno):** `master`
+- **Comando:**
+  ```bash
+  curl http://192.168.10.21:30001
+  ```
+- **Resultado Esperado:** Recibir el payload crudo emitido por Flask: `¡Hola Mundo desde Kubernetes!`.
 
 ![Prueba de Conexión](imagenes/image%20copy%205.png)
-*Ejecución de una petición `curl` dirigida hacia la IP del nodo worker (`192.168.10.21`) sobre el puerto expuesto (`30001`), recibiendo exitosamente la respuesta HTTP generada por el script Python subyacente.*
+*Ejecución exitosa de la petición HTTP.*
+
+**Prueba C: Petición HTTP Externa (Tráfico de Usuario Final)**
+- **VM (Entorno):** Máquina Física Host (tu PC).
+- **Acción:** Abre un navegador web (Chrome/Firefox/Edge) y navega a la URL:
+  `http://192.168.10.21:30001`
+- **Resultado Esperado:** La página cargará el texto de respuesta. Esto demuestra que la red `lab_net` de VirtualBox está ruteando el tráfico desde tu host físico hacia el Kernel del Worker, el cual usa `kube-proxy` e `iptables` para inyectarlo al Pod de Docker.
 
 ---
 
