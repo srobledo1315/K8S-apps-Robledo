@@ -1,0 +1,4 @@
+---
+# Valores por defecto del rol.
+dhcp_packages:
+  - dhcp-server

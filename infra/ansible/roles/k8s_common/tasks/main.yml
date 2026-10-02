@@ -1,0 +1,94 @@
+---
+- name: Instalar dependencias necesarias
+  dnf:
+    name:
+      - yum-utils
+      - python3-firewall
+      - iproute-tc
+    state: present
+
+- name: Asegurar que firewalld está iniciado
+  systemd:
+    name: firewalld
+    state: started
+    enabled: yes
+
+- name: Deshabilitar Swap temporalmente
+  command: swapoff -a
+
+- name: Deshabilitar Swap permanentemente
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    replace: '# \1'
+
+- name: Cargar módulos del kernel
+  copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+
+- name: Asegurar módulos cargados
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Configurar parámetros sysctl
+  copy:
+    dest: /etc/sysctl.d/k8s.conf
+    content: |
+      net.bridge.bridge-nf-call-iptables  = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.ipv4.ip_forward                 = 1
+
+- name: Aplicar parámetros sysctl
+  command: sysctl --system
+
+- name: Deshabilitar SELinux
+  selinux:
+    state: permissive
+    policy: targeted
+
+- name: Agregar repositorio de Docker CE (para containerd.io)
+  command: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+- name: Agregar repositorio de Kubernetes
+  yum_repository:
+    name: kubernetes
+    description: Kubernetes
+    baseurl: https://pkgs.k8s.io/core:/stable:/v1.28/rpm/
+    enabled: yes
+    gpgcheck: yes
+    repo_gpgcheck: yes
+    gpgkey: https://pkgs.k8s.io/core:/stable:/v1.28/rpm/repodata/repomd.xml.key
+
+- name: Instalar containerd y utilidades K8s
+  dnf:
+    name:
+      - containerd.io
+      - kubeadm
+      - kubelet
+      - kubectl
+    state: present
+    disable_excludes: kubernetes
+
+- name: Configurar containerd para usar SystemdCgroup
+  shell: |
+    mkdir -p /etc/containerd
+    containerd config default > /etc/containerd/config.toml
+    sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+
+- name: Reiniciar y habilitar containerd
+  systemd:
+    name: containerd
+    state: restarted
+    enabled: yes
+
+- name: Habilitar kubelet
+  systemd:
+    name: kubelet
+    enabled: yes

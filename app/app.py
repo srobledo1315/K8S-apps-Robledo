@@ -1,8 +1,7 @@
 import sys
 import os
 
-# Incorporar el paquete app al path para resolución de imports de Clean Architecture
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "app"))
+sys.path.insert(0, os.path.dirname(__file__))
 
 from src.main import create_app
 from src.infrastructure.config import AppConfig
@@ -11,5 +10,4 @@ config = AppConfig.from_environment()
 app = create_app(config)
 
 if __name__ == '__main__':
-    # Debug desactivado para mitigar vulnerabilidad RCE
     app.run(debug=config.debug, host='0.0.0.0', port=config.port)

@@ -1,0 +1,42 @@
+---
+# =========================================
+# VARIABLES GLOBALES: DNS (BIND9) & DHCPD
+# =========================================
+
+# --- DNS Bind Variables ---
+dns_domain: "santiago.gomez.lab"
+dns_server_ip: "192.168.10.10"
+dns_serial: "2026091001" # Cambiar manualmente al actualizar zonas para propagar a esclavos
+dns_reverse_zone: "10.168.192.in-addr.arpa"
+
+dns_forwarders:
+  - "8.8.8.8"
+  - "1.1.1.1"
+
+dns_allow_query:
+  - "127.0.0.0/8"
+  - "192.168.10.0/24"
+
+dns_records_a:
+  - { name: "ns1", ip: "192.168.10.10" }
+  - { name: "router", ip: "192.168.10.1" }
+  - { name: "bastion", ip: "192.168.10.10" }
+  - { name: "master", ip: "192.168.10.20" }
+  - { name: "worker", ip: "192.168.10.21" }
+
+# --- DHCP Variables ---
+dhcp_interface: "eth1" # EJEMPLO: Asegúrate de que esta interfaz exista en Rocky 9
+dhcp_subnet: "192.168.10.0"
+dhcp_netmask: "255.255.255.0"
+dhcp_range_start: "192.168.10.100"
+dhcp_range_end: "192.168.10.200"
+dhcp_gateway: "192.168.10.1"
+dhcp_broadcast: "192.168.10.255"
+
+dhcp_default_lease: 86400
+dhcp_max_lease: 172800
+
+dhcp_reservations:
+  - { name: "manager-pc", mac: "00:11:22:33:44:55", ip: "192.168.10.50" }
+  - { name: "master", mac: "08:00:27:11:22:33", ip: "192.168.10.20" }
+  - { name: "worker", mac: "08:00:27:11:22:44", ip: "192.168.10.21" }

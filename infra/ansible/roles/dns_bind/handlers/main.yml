@@ -1,0 +1,10 @@
+---
+- name: Restart named
+  ansible.builtin.service:
+    name: named
+    state: restarted
+
+- name: Reload named
+  ansible.builtin.service:
+    name: named
+    state: reloaded

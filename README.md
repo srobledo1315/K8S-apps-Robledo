@@ -21,7 +21,47 @@ Dado que la red `lab_net` está configurada como `virtualbox__intnet` (aislada d
 
 ---
 
-## 2. Diagrama de Arquitectura y Planos del Clúster
+## 2. Organización del Repositorio y Clean Architecture
+
+El proyecto implementa los principios de **Clean Architecture** y **Separación de Responsabilidades (Separation of Concerns - SoC)** tanto a nivel de repositorio DevOps/Platform como a nivel del microservicio web:
+
+```text
+├── app/                          # [CAPA DE APLICACIÓN] Microservicio Web en Python
+│   ├── Dockerfile                # Empaquetamiento OCI con usuario no-root
+│   ├── .dockerignore             # Contexto de construcción mínimo (622 bytes)
+│   ├── requirements.txt          # Dependencias fijadas (Flask==3.0.3)
+│   ├── src/                      # Código fuente modularizado (Clean Architecture)
+│   │   ├── domain/               # Entidades y reglas de negocio puras (Greeting, HealthStatus)
+│   │   ├── application/          # Casos de uso desacoplados (GetGreetingUseCase, GetHealthUseCase)
+│   │   ├── infrastructure/       # Adaptadores de entorno y configuración (AppConfig)
+│   │   ├── presentation/         # Controladores HTTP y endpoints Flask (routes.py)
+│   │   └── main.py               # Composition Root y fábrica create_app()
+│   ├── tests/                    # Pruebas unitarias de casos de uso (sin dependencias web)
+│   └── app.py                    # Entrypoint de ejecución local
+├── k8s/                          # [CAPA DE PLATAFORMA] Manifiestos Declarativos Kubernetes
+│   ├── webapp-configmap.yaml     # Configuración no confidencial (APP_ENV)
+│   ├── webapp-dbsecret.yaml      # Credenciales de base de datos
+│   ├── webapp-dhsecret.yaml      # Autenticación OCI (kubernetes.io/dockerconfigjson)
+│   ├── webapp-deployment.yaml    # Workload con cgroups (requests/limits) y probes
+│   ├── webapp-replicaset.yaml    # ReplicaSet desacoplado (app: hola-mundo-rs)
+│   └── webapp-service.yaml       # Servicio NodePort (30001 -> 80 -> 5000)
+├── infra/                        # [CAPA DE INFRAESTRUCTURA COMO CÓDIGO] IaC
+│   └── ansible/                  # Automatización del clúster y servicios base
+│       ├── ansible.cfg           # Configuración de ejecución de Ansible
+│       ├── site.yml              # Playbook principal de aprovisionamiento
+│       ├── group_vars/           # Variables de red, DNS BIND9 y DHCP
+│       └── roles/                # Roles modulares (dhcpd, dns_bind, k8s_*)
+├── docs/                         # [CAPA DE DOCUMENTACIÓN Y ACTIVOS]
+│   ├── Instalacion Cluster Kubernetes.pdf # Guía de laboratorio de la actividad
+│   └── images/                   # Evidencias fotográficas de ejecución
+├── Vagrantfile                   # Orquestación de máquinas virtuales con VirtualBox
+├── .gitignore                    # Exclusión de binarios, .vagrant y __pycache__
+└── README.md                     # Documentación técnica central del proyecto
+```
+
+---
+
+## 3. Diagrama de Arquitectura y Planos del Clúster
 
 ```mermaid
 graph TD
@@ -73,7 +113,7 @@ graph TD
 
 ---
 
-## 3. Seguridad, Optimización OCI y Código de Aplicación
+## 4. Seguridad, Optimización OCI y Código de Aplicación
 
 ### A. Contexto de Construcción y Seguridad OCI (`.dockerignore` y `Dockerfile`)
 1. **Minimización de Superficie de Ataque (`.dockerignore`):**
@@ -86,6 +126,7 @@ graph TD
    RUN useradd -u 10001 -m appuser
    COPY requirements.txt /app/
    RUN pip install --no-cache-dir -r requirements.txt
+   COPY app/ /app/app/
    COPY app.py /app/
    USER 10001
    EXPOSE 5000
@@ -101,7 +142,7 @@ graph TD
 
 ---
 
-## 4. Manifiestos y Recursos de Kubernetes (`K8S_files/`)
+## 5. Manifiestos y Recursos de Kubernetes (`k8s/` y `K8S_files/`)
 
 1. **`webapp-configmap.yaml`:**
    Define la variable no confidencial `APP_ENV: production`.
@@ -120,7 +161,7 @@ graph TD
 
 ---
 
-## 5. Evidencias del Laboratorio (Fases Operativas)
+## 6. Evidencias del Laboratorio (Fases Operativas)
 
 ### Fase 1: Despliegue Declarativo y Réplicas (Fases 3 y 5)
 Aprovisionamiento atómico de todos los recursos requeridos y validación del escalamiento a 3 réplicas en ejecución:
@@ -151,7 +192,7 @@ Inspección de la salida estándar del runtime:
 
 ---
 
-## 6. Runbook de Pruebas y Validación Operativa
+## 7. Runbook de Pruebas y Validación Operativa
 
 Ejecuta la siguiente batería técnica para auditar y verificar el funcionamiento completo:
 
@@ -204,7 +245,7 @@ Ejecuta la siguiente batería técnica para auditar y verificar el funcionamient
 
 ---
 
-## 7. Procedimiento de Despliegue y Limpieza
+## 8. Procedimiento de Despliegue y Limpieza
 
 ### Ciclo de Construcción y Publicación de la Imagen Docker
 ```bash

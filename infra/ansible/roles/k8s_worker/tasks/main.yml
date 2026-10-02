@@ -1,0 +1,27 @@
+---
+- name: Abrir puertos Firewalld para Worker
+  firewalld:
+    port: "{{ item }}"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  loop:
+    - 10250/tcp
+    - 30000-32767/tcp
+    - 8285/udp
+    - 8472/udp
+
+- name: Comprobar si el nodo ya se ha unido al clúster
+  stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_conf
+
+- name: Obtener comando de unión desde el Master
+  command: kubeadm token create --print-join-command
+  delegate_to: master
+  register: temp_join_command
+  when: not kubelet_conf.stat.exists
+
+- name: Unir el Worker al clúster
+  command: "{{ temp_join_command.stdout }}"
+  when: not kubelet_conf.stat.exists

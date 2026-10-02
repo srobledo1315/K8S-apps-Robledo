@@ -1,0 +1,13 @@
+.git
+.vagrant
+imagenes
+*.pdf
+K8S_files
+roles
+group_vars
+site.yml
+Vagrantfile
+ansible.cfg
+__pycache__
+*.pyc
+*.pyo

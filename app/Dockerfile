@@ -2,20 +2,18 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Crear usuario sin privilegios para mitigar escalada de privilegios
+# Usuario de sistema sin privilegios
 RUN useradd -u 10001 -m appuser
 
-# Copiar e instalar dependencias con caché optimizado
+# Instalación de dependencias fijadas
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar el paquete modular y el entrypoint
-COPY app/ /app/app/
+# Copiar arquitectura limpia y entrypoint
+COPY src/ /app/src/
 COPY app.py /app/
 
-# Usar usuario no root
 USER 10001
-
 EXPOSE 5000
 
 CMD ["python", "app.py"]

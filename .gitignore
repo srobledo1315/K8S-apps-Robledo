@@ -1,0 +1,21 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Vagrant local state
+.vagrant/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*~
